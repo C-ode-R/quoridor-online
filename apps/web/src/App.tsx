@@ -82,15 +82,52 @@ function Landing({ onSession }: { onSession: (token: string, snapshot: Snapshot)
   );
 }
 
-function PlayerCard({ player, active, me, walls }: { player?: PlayerView; active: boolean; me: boolean; walls?: number }) {
+function TurnTimer({ deadline, player }: { deadline: string | null; player?: PlayerView }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    setNow(Date.now());
+    if (!deadline) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [deadline]);
+
+  const seconds = deadline
+    ? Math.max(0, Math.ceil((new Date(deadline).getTime() - now) / 1000))
+    : null;
+  const formatted = seconds === null
+    ? "--:--"
+    : `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+
+  return (
+    <section className={`time-card ${seconds !== null && seconds <= 10 ? "urgent" : ""}`} aria-label="현재 차례 제한 시간">
+      <div>
+        <span>남은 시간</span>
+        <small>{player?.nickname ?? "-"} 차례</small>
+      </div>
+      <strong>{formatted}</strong>
+    </section>
+  );
+}
+
+function PlayerCard({ player, active, me, walls = 10 }: { player?: PlayerView; active: boolean; me: boolean; walls?: number }) {
   return (
     <div className={`player-card ${active ? "active" : ""}`}>
       <span className={`pawn-mini ${player?.id === "P2" ? "clay" : "green"}`} />
       <div>
         <strong>{player?.nickname ?? "기다리는 중"}{me ? " (나)" : ""}</strong>
-        <small>{player ? `${player.clientType === "BOT" ? "AI" : "플레이어"} · 벽 ${walls ?? 10}개` : "친구가 참가하면 시작됩니다"}</small>
+        <small>{player ? (player.clientType === "BOT" ? "AI" : "플레이어") : "친구가 참가하면 시작됩니다"}</small>
       </div>
       {player && <span className={`connection ${player.connected ? "online" : ""}`} title={player.connected ? "연결됨" : "연결 끊김"} />}
+      {player && (
+        <div className="wall-inventory" aria-label={`남은 벽 ${walls}개`}>
+          <span className="wall-inventory-label">벽</span>
+          <span className={`wall-units ${player.id === "P1" ? "accent" : ""}`} aria-hidden="true">
+            {Array.from({ length: 10 }, (_, index) => <i key={index} className={index < walls ? "remaining" : "used"} />)}
+          </span>
+          <b>{walls}</b>
+        </div>
+      )}
     </div>
   );
 }
@@ -213,6 +250,7 @@ function Room({ snapshot, token, onExit }: { snapshot: Snapshot; token: string; 
       ) : game ? (
         <div className="match-layout">
           <aside className="match-sidebar">
+            <TurnTimer deadline={snapshot.status === "PLAYING" ? game.turnDeadline : null} player={snapshot.players.find((player) => player.id === game.turn)} />
             <div className="players-stack">
               <PlayerCard player={p2} active={game.turn === "P2" && snapshot.status === "PLAYING"} me={snapshot.me === "P2"} walls={game.wallsRemaining.P2} />
               <div className="versus">대</div>
