@@ -1,0 +1,18 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      TURN_TIME_MS: ${TURN_TIME_MS:-60000}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/health/ready"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 10s

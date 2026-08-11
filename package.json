@@ -1,0 +1,17 @@
+{
+  "name": "quoridor-online",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,magenta \"npm run dev -w @quoridor/server\" \"npm run dev -w @quoridor/web\"",
+    "build": "npm run build -w @quoridor/game-engine && npm run build -w @quoridor/server && npm run build -w @quoridor/web",
+    "test": "npm run test -w @quoridor/game-engine && npm run test -w @quoridor/server",
+    "start": "npm run start -w @quoridor/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.2"
+  }
+}
