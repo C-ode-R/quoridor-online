@@ -134,6 +134,7 @@ function PlayerCard({ player, active, me, walls = 10 }: { player?: PlayerView; a
 
 function Board({ snapshot, onAction }: { snapshot: Snapshot; onAction: (action: GameAction) => void }) {
   const game = snapshot.game!;
+  const flipped = snapshot.me === "P2";
   const [orientation, setOrientation] = useState<Orientation>("HORIZONTAL");
   const legalMoves = useMemo(() => game.legalActions.filter((action): action is Extract<GameAction, { type: "MOVE_PAWN" }> => action.type === "MOVE_PAWN"), [game.legalActions]);
   const legalWalls = useMemo(() => new Set(game.legalActions.filter((action) => action.type === "PLACE_WALL").map((action) => `${action.orientation}:${action.row}:${action.col}`)), [game.legalActions]);
@@ -156,40 +157,45 @@ function Board({ snapshot, onAction }: { snapshot: Snapshot; onAction: (action: 
 
       <div className="board" aria-label="쿼리도 게임 보드">
         {Array.from({ length: 81 }, (_, index) => {
-          const position = { row: Math.floor(index / 9), col: index % 9 };
+          const displayPosition = { row: Math.floor(index / 9), col: index % 9 };
+          const position = flipped
+            ? { row: 8 - displayPosition.row, col: 8 - displayPosition.col }
+            : displayPosition;
           const occupant = (Object.entries(game.pawns) as [PlayerId, Position][]).find(([, pawn]) => pawn.row === position.row && pawn.col === position.col)?.[0];
           const legal = myTurn && isLegalMove(position);
           return (
-            <button key={index} className={`cell ${legal ? "legal" : ""}`} disabled={!legal} onClick={() => onAction({ type: "MOVE_PAWN", to: position })} aria-label={`${position.row + 1}행 ${position.col + 1}열${legal ? "로 이동" : ""}`}>
+            <button key={index} className={`cell ${legal ? "legal" : ""}`} disabled={!legal} onClick={() => onAction({ type: "MOVE_PAWN", to: position })} aria-label={`${displayPosition.row + 1}행 ${displayPosition.col + 1}열${legal ? "로 이동" : ""}`}>
               {occupant && <span className={`pawn ${occupant === "P1" ? "green" : "clay"}`} />}
             </button>
           );
         })}
 
-        {game.walls.map((wall, index) => <WallPiece key={`${wall.orientation}-${wall.row}-${wall.col}-${index}`} wall={wall} />)}
+        {game.walls.map((wall, index) => <WallPiece key={`${wall.orientation}-${wall.row}-${wall.col}-${index}`} wall={wall} flipped={flipped} />)}
 
         {myTurn && Array.from({ length: 64 }, (_, index) => {
           const row = Math.floor(index / 8);
           const col = index % 8;
           const key = `${orientation}:${row}:${col}`;
           if (!legalWalls.has(key)) return null;
-          return <button key={key} className={`wall-target ${orientation.toLowerCase()}`} style={wallStyle({ row, col, orientation })} onClick={() => onAction({ type: "PLACE_WALL", row, col, orientation })} aria-label={`${row + 1}, ${col + 1}에 ${orientation === "HORIZONTAL" ? "가로" : "세로"} 벽 설치`} />;
+          return <button key={key} className={`wall-target ${orientation.toLowerCase()}`} style={wallStyle({ row, col, orientation }, flipped)} onClick={() => onAction({ type: "PLACE_WALL", row, col, orientation })} aria-label={`${row + 1}, ${col + 1}에 ${orientation === "HORIZONTAL" ? "가로" : "세로"} 벽 설치`} />;
         })}
       </div>
-      <div className="goal-labels"><span>2번의 목표</span><span>1번의 목표</span></div>
     </div>
   );
 }
 
-function wallStyle(wall: Wall): React.CSSProperties {
-  if (wall.orientation === "HORIZONTAL") {
-    return { top: `${((wall.row + 1) / 9) * 100}%`, left: `${(wall.col / 9) * 100 + 0.5}%` };
+function wallStyle(wall: Wall, flipped = false): React.CSSProperties {
+  const displayWall = flipped
+    ? { ...wall, row: 7 - wall.row, col: 7 - wall.col }
+    : wall;
+  if (displayWall.orientation === "HORIZONTAL") {
+    return { top: `${((displayWall.row + 1) / 9) * 100}%`, left: `${(displayWall.col / 9) * 100 + 0.5}%` };
   }
-  return { top: `${(wall.row / 9) * 100 + 0.5}%`, left: `${((wall.col + 1) / 9) * 100}%` };
+  return { top: `${(displayWall.row / 9) * 100 + 0.5}%`, left: `${((displayWall.col + 1) / 9) * 100}%` };
 }
 
-function WallPiece({ wall }: { wall: Wall }) {
-  return <span className={`wall-piece ${wall.orientation.toLowerCase()}`} style={wallStyle(wall)} />;
+function WallPiece({ wall, flipped }: { wall: Wall; flipped: boolean }) {
+  return <span className={`wall-piece ${wall.orientation.toLowerCase()}`} style={wallStyle(wall, flipped)} />;
 }
 
 function Room({ snapshot, token, onExit }: { snapshot: Snapshot; token: string; onExit: () => void }) {
