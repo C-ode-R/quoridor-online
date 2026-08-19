@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quoridor-online-sdk"
+version = "0.1.0"
+description = "Python client for the Quoridor Online bot API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "C-ode-R" }]
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
