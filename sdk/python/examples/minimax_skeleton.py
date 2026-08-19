@@ -15,6 +15,6 @@ if __name__ == "__main__":
     run_bot(
         choose_action,
         nickname="MyMinimax",
-        server_url="https://qdr.coder.re.kr",
+        server_url="https://qrd.coder.re.kr",
         # room_code="ABC123",  # 기존 방에 참가할 때만 작성
     )

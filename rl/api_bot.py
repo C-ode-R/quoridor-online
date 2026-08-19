@@ -14,7 +14,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run a trained checkpoint on the online API")
     parser.add_argument("checkpoint")
     parser.add_argument("--name", default="RLBot")
-    parser.add_argument("--server", default="https://qdr.coder.re.kr")
+    parser.add_argument("--server", default="https://qrd.coder.re.kr")
     parser.add_argument("--room")
     parser.add_argument("--simulations", type=int, default=200)
     parser.add_argument("--wall-candidates", type=int, default=24)

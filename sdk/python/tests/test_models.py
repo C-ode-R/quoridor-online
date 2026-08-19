@@ -1,6 +1,16 @@
 import unittest
+from io import BytesIO
+from unittest.mock import patch
 
-from quoridor_sdk import MovePawn, PlaceWall, Position, Snapshot, horizontal_wall, move
+from quoridor_sdk import (
+    MovePawn,
+    PlaceWall,
+    Position,
+    QuoridorClient,
+    Snapshot,
+    horizontal_wall,
+    move,
+)
 
 
 SAMPLE = {
@@ -30,6 +40,16 @@ SAMPLE = {
 
 
 class ModelTests(unittest.TestCase):
+    def test_client_sends_explicit_sdk_user_agent(self):
+        payload = BytesIO(
+            b'{"roomCode":"ABC123","playerToken":"token","playerId":"P1"}'
+        )
+        with patch("urllib.request.urlopen", return_value=payload) as urlopen:
+            QuoridorClient("https://qrd.coder.re.kr").create_room("TestBot")
+
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.get_header("User-agent"), "quoridor-online-sdk/0.1")
+
     def test_parses_snapshot_into_typed_models(self):
         state = Snapshot.from_dict(SAMPLE)
         self.assertTrue(state.is_my_turn)

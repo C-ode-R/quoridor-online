@@ -105,7 +105,13 @@ class QuoridorClient:
         authenticated: bool = False,
         headers: Mapping[str, str] | None = None,
     ) -> Any:
-        request_headers = {"Accept": "application/json", **(headers or {})}
+        # Cloudflare rejects Python's default ``Python-urllib/*`` user agent
+        # with error 1010. Use an explicit SDK identity for bot clients.
+        request_headers = {
+            "Accept": "application/json",
+            "User-Agent": "quoridor-online-sdk/0.1",
+            **(headers or {}),
+        }
         if body is not None:
             request_headers["Content-Type"] = "application/json"
         if authenticated:
