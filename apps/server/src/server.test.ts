@@ -14,6 +14,17 @@ describe("room API", () => {
     expect(created.statusCode).toBe(201);
     const host = created.json();
 
+    const waitingSpectator = await app.inject({
+      method: "GET", url: `/api/v1/rooms/${host.roomCode.toLowerCase()}/watch`,
+    });
+    expect(waitingSpectator.statusCode).toBe(200);
+    expect(waitingSpectator.json()).toMatchObject({
+      roomCode: host.roomCode,
+      status: "WAITING",
+      me: null,
+      spectatorCount: 0,
+    });
+
     const joined = await app.inject({
       method: "POST", url: `/api/v1/rooms/${host.roomCode}/join`,
       payload: { nickname: "Beta", clientType: "BOT" },
@@ -33,5 +44,18 @@ describe("room API", () => {
     });
     expect(moved.statusCode).toBe(200);
     expect(moved.json().version).toBe(1);
+
+    const spectator = await app.inject({
+      method: "GET", url: `/api/v1/rooms/${host.roomCode}/watch`,
+    });
+    expect(spectator.statusCode).toBe(200);
+    expect(spectator.json().game.version).toBe(1);
+    expect(spectator.json().game.legalActions).toEqual([]);
+  });
+
+  it("returns 404 when spectating a missing room", async () => {
+    const response = await app.inject({ method: "GET", url: "/api/v1/rooms/ZZZZZZ/watch" });
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: { code: "ROOM_NOT_FOUND" } });
   });
 });

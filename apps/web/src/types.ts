@@ -13,6 +13,7 @@ export type Snapshot = {
   status: "WAITING" | "PLAYING" | "FINISHED";
   gameId: string | null;
   me: PlayerId | null;
+  spectatorCount: number;
   players: PlayerView[];
   game: (GameState & {
     turnDeadline: string | null;
