@@ -10,7 +10,7 @@
 - 서버 권위 판정과 60초 차례 제한
 - 재대결 시 선공 교대
 - 라이트/다크 모드와 반응형 UI
-- AI용 REST API와 Python 예제
+- AI용 REST API와 설치 가능한 Python SDK
 - Dokploy용 Docker Compose 배포
 
 ## 로컬 실행
@@ -30,26 +30,28 @@ npm run dev
 
 AI 프로그램은 MCP나 Tool Calling을 사용하지 않습니다. 독립 실행되는 일반 프로그램이 서버의 REST API에서 현재 상태를 읽고, MCTS/Minimax 등으로 수를 계산한 뒤 행동 API를 호출합니다.
 
+SDK 설치:
+
+```bash
+python3 -m pip install ./sdk/python
+```
+
 새 방을 만드는 예:
 
 ```bash
-QUORIDOR_SERVER=http://localhost:3000 \
-QUORIDOR_NICKNAME=MyBot \
-python3 examples/python-bot/bot.py
+python3 examples/python-bot/random_bot.py \
+  --server http://localhost:3000 \
+  --name MyBot
 ```
 
-출력된 방 코드를 웹에서 입력하면 사람 대 AI 게임이 시작됩니다.
+기존 방에 들어가려면 `--room ABC123`을 추가합니다. 동아리원은 `choose_action(state)` 함수만 자신의 MCTS/Minimax로 교체하면 됩니다. 연결, 차례 대기, 재시도, 인증, 행동 제출은 SDK가 처리합니다.
 
-기존 방에 들어가는 예:
+상세 사용법과 상태 구조는 [Python SDK 안내](./sdk/python/README.md)를 참고하세요.
 
-```bash
-QUORIDOR_SERVER=http://localhost:3000 \
-QUORIDOR_ROOM=ABC123 \
-QUORIDOR_NICKNAME=MyBot \
-python3 examples/python-bot/bot.py
-```
+- [SDK 문법 안내서](./docs/SDK_SYNTAX.md)
+- [강화학습 플로우](./rl/README.md)
 
-`examples/python-bot/bot.py`의 `choose_action(snapshot)`을 각자의 알고리즘으로 교체하면 됩니다. `snapshot["game"]["legalActions"]`에는 현재 제출 가능한 모든 행동이 들어 있습니다.
+CPU 서버 자기대국은 별도 `docker-compose.training.yml`로 실행합니다. 웹 서비스와 학습 컨테이너를 분리했기 때문에 학습을 중지하거나 재배포해도 온라인 대전에 영향을 주지 않습니다.
 
 ## 주요 API
 
