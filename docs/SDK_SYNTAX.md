@@ -30,7 +30,7 @@ def choose_action(state):
 run_bot(
     choose_action,
     nickname="RandomBot",
-    server_url="https://qdr.coder.re.kr",
+    server_url="https://qrd.coder.re.kr",
 )
 ```
 
@@ -40,7 +40,7 @@ run_bot(
 run_bot(
     choose_action,
     nickname="MyBot",
-    server_url="https://qdr.coder.re.kr",
+    server_url="https://qrd.coder.re.kr",
     room_code="ABC123",
 )
 ```
@@ -168,7 +168,7 @@ opponent_walls = state.game.walls_remaining[opponent_id]
 result = run_bot(
     choose_action,
     nickname="MyBot",
-    server_url="https://qdr.coder.re.kr",
+    server_url="https://qrd.coder.re.kr",
 )
 
 print(result.won)
@@ -184,7 +184,7 @@ print(result.room_code)
 ```python
 from quoridor_sdk import QuoridorClient
 
-client = QuoridorClient("https://qdr.coder.re.kr")
+client = QuoridorClient("https://qrd.coder.re.kr")
 session = client.create_room("MyBot")
 
 print(session.room_code)

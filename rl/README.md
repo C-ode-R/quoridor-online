@@ -190,7 +190,7 @@ python3 rl/evaluate.py checkpoints/quoridor_latest.pt \
 ```bash
 python3 rl/api_bot.py checkpoints/quoridor_latest.pt \
   --name AlphaZeroLite \
-  --server https://qdr.coder.re.kr \
+  --server https://qrd.coder.re.kr \
   --simulations 200 \
   --wall-candidates 20 \
   --threads 2

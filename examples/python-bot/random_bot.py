@@ -13,7 +13,7 @@ def main():
     parser = argparse.ArgumentParser(description="Quoridor Online example bot")
     parser.add_argument("--name", default="RandomBot", help="봇 닉네임")
     parser.add_argument("--room", help="참가할 6자리 방 코드. 생략하면 새 방 생성")
-    parser.add_argument("--server", default="https://qdr.coder.re.kr", help="게임 서버 주소")
+    parser.add_argument("--server", default="https://qrd.coder.re.kr", help="게임 서버 주소")
     args = parser.parse_args()
 
     run_bot(

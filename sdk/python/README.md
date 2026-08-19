@@ -30,7 +30,7 @@ def choose_action(state):
 run_bot(
     choose_action,
     nickname="RandomBot",
-    server_url="https://qdr.coder.re.kr",
+    server_url="https://qrd.coder.re.kr",
 )
 ```
 
@@ -42,7 +42,7 @@ run_bot(
 run_bot(
     choose_action,
     nickname="MyBot",
-    server_url="https://qdr.coder.re.kr",
+    server_url="https://qrd.coder.re.kr",
     room_code="ABC123",
 )
 ```
@@ -93,7 +93,7 @@ def choose_action(state):
 run_bot(
     choose_action,
     nickname="MCTS-10000",
-    server_url="https://qdr.coder.re.kr",
+    server_url="https://qrd.coder.re.kr",
     room_code=None,
 )
 ```
