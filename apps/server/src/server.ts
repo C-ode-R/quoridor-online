@@ -19,6 +19,7 @@ import {
 
 type ClientType = "HUMAN" | "BOT";
 type RoomStatus = "WAITING" | "PLAYING" | "FINISHED";
+type RoomSocket = { send: (data: string) => void; readyState: number };
 
 type Player = {
   id: PlayerId;
@@ -27,7 +28,7 @@ type Player = {
   token: string;
   connected: boolean;
   rematchReady: boolean;
-  sockets: Set<{ send: (data: string) => void; readyState: number }>;
+  sockets: Set<RoomSocket>;
 };
 
 type Room = {
@@ -40,6 +41,7 @@ type Room = {
   turnDeadline: string | null;
   finishReason: "GOAL" | "TIMEOUT" | null;
   timer: NodeJS.Timeout | null;
+  spectatorSockets: Set<RoomSocket>;
 };
 
 const createRoomSchema = z.object({
@@ -88,6 +90,7 @@ function publicSnapshot(room: Room, viewer?: Player) {
     status: room.status,
     gameId: room.gameId,
     me: viewer?.id ?? null,
+    spectatorCount: room.spectatorSockets.size,
     players: room.players.map((player) => ({
       id: player.id,
       nickname: player.nickname,
@@ -122,6 +125,10 @@ function broadcast(room: Room): void {
     for (const socket of player.sockets) {
       if (socket.readyState === 1) socket.send(message);
     }
+  }
+  const spectatorMessage = JSON.stringify({ type: "room.snapshot", payload: publicSnapshot(room) });
+  for (const socket of room.spectatorSockets) {
+    if (socket.readyState === 1) socket.send(spectatorMessage);
   }
 }
 
@@ -193,6 +200,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     const room: Room = {
       code: makeRoomCode(), status: "WAITING", players: [], gameId: null, game: null,
       firstPlayer: "P1", turnDeadline: null, finishReason: null, timer: null,
+      spectatorSockets: new Set(),
     };
     rooms.set(room.code, room);
     const player = addPlayer(room, parsed.data.nickname, parsed.data.clientType);
@@ -220,6 +228,14 @@ export async function buildServer(): Promise<FastifyInstance> {
     };
     startGame(room);
     return reply.code(201).send(response);
+  });
+
+  app.get("/api/v1/rooms/:code/watch", async (request, reply) => {
+    const { code } = request.params as { code: string };
+    const room = rooms.get(code.toUpperCase());
+    if (!room) return error(reply, 404, "ROOM_NOT_FOUND");
+    reply.header("Cache-Control", "no-store");
+    return publicSnapshot(room);
   });
 
   app.get("/api/v1/session", async (request, reply) => {
@@ -291,20 +307,34 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   app.get("/ws", { websocket: true }, (socket, request) => {
-    const query = request.query as { token?: string };
-    const room = query.token ? tokenToRoom.get(query.token) : undefined;
-    const player = room ? playerByToken(room, query.token) : undefined;
-    if (!room || !player) {
-      socket.close(1008, "Invalid token");
+    const query = request.query as { token?: string; room?: string };
+    if (query.token) {
+      const room = tokenToRoom.get(query.token);
+      const player = room ? playerByToken(room, query.token) : undefined;
+      if (!room || !player) {
+        socket.close(1008, "Invalid token");
+        return;
+      }
+      player.sockets.add(socket);
+      player.connected = true;
+      broadcast(room);
+      socket.on("close", () => {
+        player.sockets.delete(socket);
+        player.connected = player.clientType === "BOT" || player.sockets.size > 0;
+        broadcast(room);
+      });
       return;
     }
-    player.sockets.add(socket);
-    player.connected = true;
-    socket.send(JSON.stringify({ type: "room.snapshot", payload: publicSnapshot(room, player) }));
+
+    const room = query.room ? rooms.get(query.room.toUpperCase()) : undefined;
+    if (!room) {
+      socket.close(1008, "Invalid room");
+      return;
+    }
+    room.spectatorSockets.add(socket);
     broadcast(room);
     socket.on("close", () => {
-      player.sockets.delete(socket);
-      player.connected = player.clientType === "BOT" || player.sockets.size > 0;
+      room.spectatorSockets.delete(socket);
       broadcast(room);
     });
   });

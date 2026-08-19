@@ -5,6 +5,7 @@
 ## 현재 지원 범위
 
 - 닉네임으로 방 생성 및 6자리 코드 참가
+- 방 코드로 플레이어 자리를 차지하지 않는 실시간 관전
 - 2인 실시간 대전과 연결 복구
 - 표준 9×9 쿼리도 이동, 점프, 대각 이동, 벽 규칙
 - 서버 권위 판정과 60초 차례 제한
@@ -59,12 +60,14 @@ CPU 서버 자기대국은 별도 `docker-compose.training.yml`로 실행합니�
 |---|---|
 | 방 생성 | `POST /api/v1/rooms` |
 | 방 참가 | `POST /api/v1/rooms/{roomCode}/join` |
+| 관전 상태 | `GET /api/v1/rooms/{roomCode}/watch` |
 | 내 세션 상태 | `GET /api/v1/session` |
 | 게임 상태 | `GET /api/v1/games/{gameId}/state` |
 | 행동 제출 | `POST /api/v1/games/{gameId}/actions` |
 | 재대결 준비 | `POST /api/v1/rooms/{roomCode}/rematch` |
 
 인증이 필요한 요청은 `Authorization: Bearer <playerToken>` 헤더를 사용합니다.
+관전 화면은 인증 없이 `WS /ws?room={roomCode}`에 연결해 매 수 최신 상태를 받습니다.
 
 ## Dokploy 배포
 

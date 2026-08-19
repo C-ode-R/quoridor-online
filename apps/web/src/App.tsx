@@ -3,6 +3,7 @@ import type { GameAction, Orientation, PlayerId, Position, Wall } from "@quorido
 import type { PlayerView, Snapshot } from "./types";
 
 const TOKEN_KEY = "crossway-player-token";
+const WATCH_ROOM_KEY = "crossway-watch-room";
 type Theme = "light" | "dark";
 
 function getInitialTheme(): Theme {
@@ -33,18 +34,26 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }
   );
 }
 
-function Landing({ onSession }: { onSession: (token: string, snapshot: Snapshot) => void }) {
+function Landing({ onSession, onWatch }: {
+  onSession: (token: string, snapshot: Snapshot) => void;
+  onWatch: (snapshot: Snapshot) => void;
+}) {
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const submit = async (mode: "create" | "join") => {
-    if (!nickname.trim()) return setError("닉네임을 입력해주세요.");
-    if (mode === "join" && roomCode.trim().length !== 6) return setError("6자리 방 코드를 입력해주세요.");
+  const submit = async (mode: "create" | "join" | "watch") => {
+    if (mode !== "watch" && !nickname.trim()) return setError("닉네임을 입력해주세요.");
+    if (mode !== "create" && roomCode.trim().length !== 6) return setError("6자리 방 코드를 입력해주세요.");
     setBusy(true);
     setError("");
     try {
+      if (mode === "watch") {
+        const watched = await api<Snapshot>(`/api/v1/rooms/${roomCode.trim().toUpperCase()}/watch`);
+        onWatch(watched);
+        return;
+      }
       const path = mode === "create" ? "/api/v1/rooms" : `/api/v1/rooms/${roomCode.trim().toUpperCase()}/join`;
       const result = await api<{ playerToken: string; snapshot: Snapshot }>(path, {
         method: "POST",
@@ -64,17 +73,18 @@ function Landing({ onSession }: { onSession: (token: string, snapshot: Snapshot)
       <section className="join-card" aria-label="게임 시작">
         <div className="simple-heading">
           <h1>쿼리도</h1>
-          <p>방을 만들거나 코드로 참가하세요.</p>
+          <p>방을 만들거나 코드로 참가·관전하세요.</p>
         </div>
         <label>
           <span>닉네임</span>
           <input maxLength={20} value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="어떻게 불러드릴까요?" autoComplete="nickname" />
         </label>
         <button className="primary-button" disabled={busy} onClick={() => submit("create")}>새 방 만들기 <span>→</span></button>
-        <div className="divider"><span>또는 방 코드로 참가</span></div>
+        <div className="divider"><span>또는 방 코드로 참가·관전</span></div>
         <div className="code-row">
           <input aria-label="방 코드" maxLength={6} value={roomCode} onChange={(event) => setRoomCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="ABC123" />
           <button disabled={busy} onClick={() => submit("join")}>참가</button>
+          <button className="watch-button" disabled={busy} onClick={() => submit("watch")}>관전</button>
         </div>
         {error && <p className="form-error" role="alert">{error}</p>}
       </section>
@@ -139,19 +149,24 @@ function Board({ snapshot, onAction }: { snapshot: Snapshot; onAction: (action: 
   const legalMoves = useMemo(() => game.legalActions.filter((action): action is Extract<GameAction, { type: "MOVE_PAWN" }> => action.type === "MOVE_PAWN"), [game.legalActions]);
   const legalWalls = useMemo(() => new Set(game.legalActions.filter((action) => action.type === "PLACE_WALL").map((action) => `${action.orientation}:${action.row}:${action.col}`)), [game.legalActions]);
   const myTurn = snapshot.me === game.turn && snapshot.status === "PLAYING";
+  const spectating = snapshot.me === null;
 
   const isLegalMove = (position: Position) => legalMoves.some((move) => move.to.row === position.row && move.to.col === position.col);
 
   return (
     <div className="board-column">
       <div className="board-toolbar">
-        <div>
-          <span className="toolbar-label">벽 방향</span>
-          <div className="segmented" aria-label="벽 방향 선택">
-            <button className={orientation === "HORIZONTAL" ? "selected" : ""} onClick={() => setOrientation("HORIZONTAL")} aria-label="가로 벽">━</button>
-            <button className={orientation === "VERTICAL" ? "selected" : ""} onClick={() => setOrientation("VERTICAL")} aria-label="세로 벽">┃</button>
+        {spectating ? (
+          <span className="spectator-badge">관전 중</span>
+        ) : (
+          <div>
+            <span className="toolbar-label">벽 방향</span>
+            <div className="segmented" aria-label="벽 방향 선택">
+              <button className={orientation === "HORIZONTAL" ? "selected" : ""} onClick={() => setOrientation("HORIZONTAL")} aria-label="가로 벽">━</button>
+              <button className={orientation === "VERTICAL" ? "selected" : ""} onClick={() => setOrientation("VERTICAL")} aria-label="세로 벽">┃</button>
+            </div>
           </div>
-        </div>
+        )}
         <span className={`turn-pill ${myTurn ? "mine" : ""}`}>{myTurn ? "내 차례" : `${game.turn === "P1" ? "1번" : "2번"} 차례`}</span>
       </div>
 
@@ -198,13 +213,14 @@ function WallPiece({ wall, flipped }: { wall: Wall; flipped: boolean }) {
   return <span className={`wall-piece ${wall.orientation.toLowerCase()}`} style={wallStyle(wall, flipped)} />;
 }
 
-function Room({ snapshot, token, onExit }: { snapshot: Snapshot; token: string; onExit: () => void }) {
+function Room({ snapshot, token, onExit }: { snapshot: Snapshot; token?: string; onExit: () => void }) {
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const game = snapshot.game;
   const p1 = snapshot.players.find((player) => player.id === "P1");
   const p2 = snapshot.players.find((player) => player.id === "P2");
+  const spectating = snapshot.me === null;
 
   const copyCode = async () => {
     await navigator.clipboard.writeText(snapshot.roomCode);
@@ -213,7 +229,7 @@ function Room({ snapshot, token, onExit }: { snapshot: Snapshot; token: string; 
   };
 
   const submitAction = async (action: GameAction) => {
-    if (!game || !snapshot.gameId || submitting) return;
+    if (!token || !game || !snapshot.gameId || submitting) return;
     setSubmitting(true);
     setError("");
     try {
@@ -231,6 +247,7 @@ function Room({ snapshot, token, onExit }: { snapshot: Snapshot; token: string; 
   };
 
   const rematch = async () => {
+    if (!token) return;
     await api(`/api/v1/rooms/${snapshot.roomCode}/rematch`, { method: "POST", body: "{}" }, token);
   };
 
@@ -244,7 +261,10 @@ function Room({ snapshot, token, onExit }: { snapshot: Snapshot; token: string; 
           <span className="room-label">방 코드</span>
           <button className="room-code" onClick={copyCode}>{snapshot.roomCode} <small>{copied ? "복사됨" : "복사"}</small></button>
         </div>
-        <button className="text-button" onClick={onExit}>나가기</button>
+        <div className="header-actions">
+          {spectating && <span className="viewer-count">관전자 {snapshot.spectatorCount}</span>}
+          <button className="text-button" onClick={onExit}>{spectating ? "관전 종료" : "나가기"}</button>
+        </div>
       </header>
 
       {snapshot.status === "WAITING" ? (
@@ -271,8 +291,8 @@ function Room({ snapshot, token, onExit }: { snapshot: Snapshot; token: string; 
                 <span className={`result-pawn ${game.winner === "P2" ? "clay" : "green"}`} />
                 <h2>{winner?.nickname} 승리</h2>
                 <p>{game.finishReason === "TIMEOUT" ? "제한 시간이 끝났습니다." : "반대편 끝에 먼저 도착했습니다."}</p>
-                <button className="primary-button" onClick={rematch} disabled={me?.rematchReady}>{me?.rematchReady ? "상대의 선택을 기다리는 중" : "재대결"}</button>
-                <button className="text-button" onClick={onExit}>방 나가기</button>
+                {!spectating && <button className="primary-button" onClick={rematch} disabled={me?.rematchReady}>{me?.rematchReady ? "상대의 선택을 기다리는 중" : "재대결"}</button>}
+                <button className="text-button" onClick={onExit}>{spectating ? "관전 종료" : "방 나가기"}</button>
               </section>
             </div>
           )}
@@ -285,17 +305,21 @@ function Room({ snapshot, token, onExit }: { snapshot: Snapshot; token: string; 
 export default function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) ?? "");
+  const [watchRoom, setWatchRoom] = useState(() => localStorage.getItem(WATCH_ROOM_KEY) ?? "");
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [restoring, setRestoring] = useState(Boolean(token));
+  const [restoring, setRestoring] = useState(Boolean(token || watchRoom));
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("crossway-theme", theme);
   }, [theme]);
 
-  const connect = useCallback((sessionToken: string) => {
+  const connect = useCallback((params: { token?: string; room?: string }) => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(`${protocol}//${window.location.host}/ws?token=${encodeURIComponent(sessionToken)}`);
+    const query = params.token
+      ? `token=${encodeURIComponent(params.token)}`
+      : `room=${encodeURIComponent(params.room ?? "")}`;
+    const socket = new WebSocket(`${protocol}//${window.location.host}/ws?${query}`);
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
       if (message.type === "room.snapshot") setSnapshot(message.payload);
@@ -304,31 +328,73 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!token) { setRestoring(false); return; }
+    if (!token && !watchRoom) { setRestoring(false); return; }
+    let disposed = false;
     let socket: WebSocket | undefined;
-    api<Snapshot>("/api/v1/session", {}, token)
-      .then((restored) => { setSnapshot(restored); socket = connect(token); })
-      .catch(() => { localStorage.removeItem(TOKEN_KEY); setToken(""); })
-      .finally(() => setRestoring(false));
-    return () => socket?.close();
-  }, [token, connect]);
+    let reconnectTimer: number | undefined;
+    const connectionParams = token ? { token } : { room: watchRoom };
+    const openSocket = () => {
+      if (disposed) return;
+      socket = connect(connectionParams);
+      socket.onclose = () => {
+        if (!disposed) reconnectTimer = window.setTimeout(openSocket, 1_000);
+      };
+    };
+    const restore = token
+      ? api<Snapshot>("/api/v1/session", {}, token)
+      : api<Snapshot>(`/api/v1/rooms/${watchRoom}/watch`);
+    restore
+      .then((restored) => {
+        if (disposed) return;
+        setSnapshot(restored);
+        openSocket();
+      })
+      .catch(() => {
+        if (disposed) return;
+        if (token) {
+          localStorage.removeItem(TOKEN_KEY);
+          setToken("");
+        } else {
+          localStorage.removeItem(WATCH_ROOM_KEY);
+          setWatchRoom("");
+        }
+      })
+      .finally(() => { if (!disposed) setRestoring(false); });
+    return () => {
+      disposed = true;
+      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      socket?.close();
+    };
+  }, [token, watchRoom, connect]);
 
   const beginSession = (sessionToken: string, initial: Snapshot) => {
+    localStorage.removeItem(WATCH_ROOM_KEY);
     localStorage.setItem(TOKEN_KEY, sessionToken);
     setSnapshot(initial);
+    setWatchRoom("");
     setToken(sessionToken);
+  };
+
+  const beginWatch = (initial: Snapshot) => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.setItem(WATCH_ROOM_KEY, initial.roomCode);
+    setSnapshot(initial);
+    setToken("");
+    setWatchRoom(initial.roomCode);
   };
 
   const exit = () => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(WATCH_ROOM_KEY);
     setToken("");
+    setWatchRoom("");
     setSnapshot(null);
   };
 
   return (
     <div className="app">
       <nav className="topbar"><ThemeToggle theme={theme} onToggle={() => setTheme(theme === "light" ? "dark" : "light")} /></nav>
-      {restoring ? <div className="loading"><span /><p>게임을 불러오는 중</p></div> : snapshot && token ? <Room snapshot={snapshot} token={token} onExit={exit} /> : <Landing onSession={beginSession} />}
+      {restoring ? <div className="loading"><span /><p>게임을 불러오는 중</p></div> : snapshot && (token || watchRoom) ? <Room snapshot={snapshot} token={token || undefined} onExit={exit} /> : <Landing onSession={beginSession} onWatch={beginWatch} />}
     </div>
   );
 }
