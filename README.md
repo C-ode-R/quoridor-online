@@ -11,7 +11,7 @@
 - 서버 권위 판정과 60초 차례 제한
 - 재대결 시 선공 교대
 - 라이트/다크 모드와 반응형 UI
-- AI용 REST API와 설치 가능한 Python SDK
+- AI용 REST API와 설치 가능한 Python/C++ SDK
 - Dokploy용 Docker Compose 배포
 
 ## 로컬 실행
@@ -48,6 +48,8 @@ python3 examples/python-bot/random_bot.py \
 기존 방에 들어가려면 `--room ABC123`을 추가합니다. 동아리원은 `choose_action(state)` 함수만 자신의 MCTS/Minimax로 교체하면 됩니다. 연결, 차례 대기, 재시도, 인증, 행동 제출은 SDK가 처리합니다.
 
 상세 사용법과 상태 구조는 [Python SDK 안내](./sdk/python/README.md)를 참고하세요.
+
+C++20에서 게임 로직과 HTTPS 서버 요청을 모두 처리하려면 [C++ SDK 저장소](https://github.com/C-ode-R/quoridor-cpp-sdk)를 참고하세요.
 
 - [SDK 문법 안내서](./docs/SDK_SYNTAX.md)
 - [강화학습 플로우](./rl/README.md)
