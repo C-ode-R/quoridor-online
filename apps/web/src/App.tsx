@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GameAction, Orientation, PlayerId, Position, Wall } from "@quoridor/game-engine";
 import type { PlayerView, Snapshot } from "./types";
+import Tournament from "./Tournament";
 
 const TOKEN_KEY = "crossway-player-token";
 const WATCH_ROOM_KEY = "crossway-watch-room";
+const TOURNAMENT_KEY = "crossway-tournament";
 type Theme = "light" | "dark";
 
 function getInitialTheme(): Theme {
@@ -34,9 +36,10 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }
   );
 }
 
-function Landing({ onSession, onWatch }: {
+function Landing({ onSession, onWatch, onTournament }: {
   onSession: (token: string, snapshot: Snapshot) => void;
   onWatch: (snapshot: Snapshot) => void;
+  onTournament: () => void;
 }) {
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
@@ -86,6 +89,7 @@ function Landing({ onSession, onWatch }: {
           <button disabled={busy} onClick={() => submit("join")}>참가</button>
           <button className="watch-button" disabled={busy} onClick={() => submit("watch")}>관전</button>
         </div>
+        <button className="tournament-link" onClick={onTournament}>대진표 만들기·보기 <span>→</span></button>
         {error && <p className="form-error" role="alert">{error}</p>}
       </section>
     </main>
@@ -290,8 +294,8 @@ function Room({ snapshot, token, onExit }: { snapshot: Snapshot; token?: string;
               <section className="result-card" role="dialog" aria-modal="true" aria-label="게임 결과">
                 <span className={`result-pawn ${game.winner === "P2" ? "clay" : "green"}`} />
                 <h2>{winner?.nickname} 승리</h2>
-                <p>{game.finishReason === "TIMEOUT" ? "제한 시간이 끝났습니다." : "반대편 끝에 먼저 도착했습니다."}</p>
-                {!spectating && <button className="primary-button" onClick={rematch} disabled={me?.rematchReady}>{me?.rematchReady ? "상대의 선택을 기다리는 중" : "재대결"}</button>}
+                <p>{game.finishReason === "TIMEOUT" ? "제한 시간이 끝났습니다." : game.finishReason === "FORFEIT" ? "상대 선수가 기권했습니다." : "반대편 끝에 먼저 도착했습니다."}</p>
+                {!spectating && !snapshot.tournamentCode && game.finishReason !== "FORFEIT" && <button className="primary-button" onClick={rematch} disabled={me?.rematchReady}>{me?.rematchReady ? "상대의 선택을 기다리는 중" : "재대결"}</button>}
                 <button className="text-button" onClick={onExit}>{spectating ? "관전 종료" : "방 나가기"}</button>
               </section>
             </div>
@@ -306,6 +310,8 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) ?? "");
   const [watchRoom, setWatchRoom] = useState(() => localStorage.getItem(WATCH_ROOM_KEY) ?? "");
+  const [tournamentCode, setTournamentCode] = useState(() => localStorage.getItem(TOURNAMENT_KEY) ?? "");
+  const [tournamentOpen, setTournamentOpen] = useState(Boolean(tournamentCode));
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [restoring, setRestoring] = useState(Boolean(token || watchRoom));
 
@@ -391,10 +397,36 @@ export default function App() {
     setSnapshot(null);
   };
 
+  const updateTournamentCode = (code: string) => {
+    localStorage.setItem(TOURNAMENT_KEY, code);
+    setTournamentCode(code);
+    setTournamentOpen(true);
+  };
+
+  const closeTournament = () => {
+    localStorage.removeItem(TOURNAMENT_KEY);
+    setTournamentCode("");
+    setTournamentOpen(false);
+  };
+
   return (
     <div className="app">
       <nav className="topbar"><ThemeToggle theme={theme} onToggle={() => setTheme(theme === "light" ? "dark" : "light")} /></nav>
-      {restoring ? <div className="loading"><span /><p>게임을 불러오는 중</p></div> : snapshot && (token || watchRoom) ? <Room snapshot={snapshot} token={token || undefined} onExit={exit} /> : <Landing onSession={beginSession} onWatch={beginWatch} />}
+      {restoring ? (
+        <div className="loading"><span /><p>게임을 불러오는 중</p></div>
+      ) : snapshot && (token || watchRoom) ? (
+        <Room snapshot={snapshot} token={token || undefined} onExit={exit} />
+      ) : tournamentOpen ? (
+        <Tournament
+          initialCode={tournamentCode}
+          onCodeChange={updateTournamentCode}
+          onClose={closeTournament}
+          onSession={beginSession}
+          onWatch={beginWatch}
+        />
+      ) : (
+        <Landing onSession={beginSession} onWatch={beginWatch} onTournament={() => setTournamentOpen(true)} />
+      )}
     </div>
   );
 }
