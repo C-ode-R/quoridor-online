@@ -20,6 +20,7 @@ RUN npm ci --omit=dev
 COPY --from=build /app/apps/server/dist ./apps/server/dist
 COPY --from=build /app/apps/web/dist ./apps/web/dist
 COPY --from=build /app/packages/game-engine/dist ./packages/game-engine/dist
+RUN mkdir -p /data && chown node:node /data
 USER node
 EXPOSE 3000
 CMD ["node", "apps/server/dist/index.js"]

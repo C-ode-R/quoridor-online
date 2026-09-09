@@ -10,9 +10,15 @@ services:
       NODE_ENV: production
       PORT: 3000
       TURN_TIME_MS: ${TURN_TIME_MS:-60000}
+      STATE_FILE: /data/state.json
+    volumes:
+      - quoridor-data:/data
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/health/ready"]
       interval: 20s
       timeout: 3s
       retries: 3
       start_period: 10s
+
+volumes:
+  quoridor-data:
